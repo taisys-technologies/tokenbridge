@@ -19,7 +19,9 @@ const {
   isGasPriceError,
   isSameTransactionError,
   isInsufficientBalanceError,
-  isNonceError
+  isNonceError,
+  loadPrivateKey,
+  getValidatorAddress
 } = require('./utils/utils')
 const { EXIT_CODES, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT, MIN_GAS_PRICE_BUMP_FACTOR } = require('./utils/constants')
 
@@ -84,9 +86,10 @@ function unsuspend() {
 
 async function readNonce(forceUpdate) {
   logger.debug('Reading nonce')
+  const validatorAddress = await getValidatorAddress()
   if (forceUpdate) {
     logger.debug('Forcing update of nonce')
-    return getNonce(web3, config.validatorAddress)
+    return getNonce(web3, validatorAddress)
   }
 
   const nonce = await redis.get(nonceKey)
@@ -95,7 +98,7 @@ async function readNonce(forceUpdate) {
     return Number(nonce)
   } else {
     logger.warn("Nonce wasn't found in the DB")
-    return getNonce(web3, config.validatorAddress)
+    return getNonce(web3, validatorAddress)
   }
 }
 
@@ -167,12 +170,13 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
           logger.info(`Transaction ${job.txHash} was not mined, updating gasPrice: ${oldGasPrice} -> ${newGasPrice}`)
         }
         logger.info(`Sending transaction with nonce ${nonce}`)
+        const privateKey = await loadPrivateKey()
         const txHash = await sendTx({
           data: job.data,
           nonce,
           value: '0',
           gasLimit,
-          privateKey: config.validatorPrivateKey,
+          privateKey,
           to: job.to,
           chainId,
           web3: web3Redundant,
@@ -212,7 +216,8 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
 
         if (isInsufficientBalanceError(e)) {
           insufficientFunds = true
-          const currentBalance = await web3.eth.getBalance(config.validatorAddress)
+          const validatorAddress = await getValidatorAddress()
+          const currentBalance = await web3.eth.getBalance(validatorAddress)
           minimumBalance = gasLimit.multipliedBy(gasPriceOptions.gasPrice || gasPriceOptions.maxFeePerGas)
           logger.error(
             `Insufficient funds: ${currentBalance}. Stop processing messages until the balance is at least ${minimumBalance}.`
@@ -242,7 +247,8 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
     if (insufficientFunds) {
       logger.warn('Insufficient funds. Stop sending transactions until the account has the minimum balance')
       channel.close()
-      waitForFunds(web3, config.validatorAddress, minimumBalance, resume, logger)
+      const validatorAddress = await getValidatorAddress()
+      waitForFunds(web3, validatorAddress, minimumBalance, resume, logger)
     }
   } catch (e) {
     logger.error(e)

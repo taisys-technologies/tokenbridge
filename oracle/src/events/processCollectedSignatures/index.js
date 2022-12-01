@@ -4,7 +4,7 @@ const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
 const { signatureToVRS, packSignatures, parseMessage } = require('../../utils/message')
-const { readAccessListFile } = require('../../utils/utils')
+const { readAccessListFile, getValidatorAddress } = require('../../utils/utils')
 const estimateGas = require('./estimateGas')
 const { AlreadyProcessedError, IncompatibleContractError, InvalidValidatorError } = require('../../utils/errors')
 const { MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
@@ -29,7 +29,7 @@ function processCollectedSignaturesBuilder(config) {
     if (validatorContract === null) {
       validatorContract = await getValidatorContract(foreign.bridgeContract, foreign.web3)
     }
-
+    const validatorAddress = await getValidatorAddress()
     rootLogger.debug(`Processing ${signatures.length} CollectedSignatures events`)
     const callbacks = signatures
       .map(colSignature => async () => {
@@ -41,7 +41,7 @@ function processCollectedSignaturesBuilder(config) {
 
         if (ORACLE_ALWAYS_RELAY_SIGNATURES && ORACLE_ALWAYS_RELAY_SIGNATURES === 'true') {
           logger.debug('Validator handles all CollectedSignature requests')
-        } else if (authorityResponsibleForRelay !== home.web3.utils.toChecksumAddress(config.validatorAddress)) {
+        } else if (authorityResponsibleForRelay !== home.web3.utils.toChecksumAddress(validatorAddress)) {
           logger.info(`Validator not responsible for relaying CollectedSignatures ${colSignature.transactionHash}`)
           return
         }

@@ -7,6 +7,7 @@ const { EXIT_CODES, MAX_CONCURRENT_EVENTS, EXTRA_GAS_ABSOLUTE } = require('../..
 const estimateGas = require('./estimateGas')
 const { parseAMBMessage } = require('../../../../commons')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const { getValidatorAddress } = require('../../utils/utils')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -35,7 +36,7 @@ function processAffirmationRequestsBuilder(config) {
         const { sender, executor } = parseAMBMessage(message)
 
         logger.info({ sender, executor }, `Processing affirmationRequest ${messageId}`)
-
+        const validatorAddress = await getValidatorAddress()
         let gasEstimate
         try {
           logger.debug('Estimate gas')
@@ -44,14 +45,14 @@ function processAffirmationRequestsBuilder(config) {
             homeBridge: bridgeContract,
             validatorContract,
             message,
-            address: config.validatorAddress
+            address: validatorAddress
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
         } catch (e) {
           if (e instanceof HttpListProviderError) {
             throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
           } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
+            logger.fatal({ address: validatorAddress }, 'Invalid validator')
             process.exit(EXIT_CODES.INCOMPATIBILITY)
           } else if (e instanceof AlreadySignedError) {
             logger.info(`Already signed affirmationRequest ${messageId}`)

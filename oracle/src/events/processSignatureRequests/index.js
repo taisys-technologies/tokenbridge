@@ -7,6 +7,7 @@ const { createMessage } = require('../../utils/message')
 const estimateGas = require('./estimateGas')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
+const { loadPrivateKey, getValidatorAddress } = require('../../utils/utils')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -45,8 +46,9 @@ function processSignatureRequestsBuilder(config) {
           bridgeAddress: config.foreign.bridgeAddress,
           expectedMessageLength
         })
-
-        const signature = web3.eth.accounts.sign(message, config.validatorPrivateKey)
+        const privateKey = await loadPrivateKey()
+        const signature = web3.eth.accounts.sign(message, privateKey)
+        const validatorAddress = await getValidatorAddress()
 
         let gasEstimate
         try {
@@ -57,14 +59,14 @@ function processSignatureRequestsBuilder(config) {
             validatorContract,
             signature: signature.signature,
             message,
-            address: config.validatorAddress
+            address: validatorAddress
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
         } catch (e) {
           if (e instanceof HttpListProviderError) {
             throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
           } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
+            logger.fatal({ address: validatorAddress }, 'Invalid validator')
             process.exit(EXIT_CODES.INCOMPATIBILITY)
           } else if (e instanceof AlreadySignedError) {
             logger.info(`Already signed signatureRequest ${signatureRequest.transactionHash}`)

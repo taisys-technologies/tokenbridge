@@ -7,7 +7,7 @@ const GasPrice = require('./services/gasPrice')
 const { getNonce, getChainId, getEventsFromTx } = require('./tx/web3')
 const { sendTx } = require('./tx/sendTx')
 const { getTokensState } = require('./utils/tokenState')
-const { checkHTTPS, watchdog, syncForEach, addExtraGas } = require('./utils/utils')
+const { checkHTTPS, watchdog, syncForEach, addExtraGas, loadPrivateKey, getValidatorAddress } = require('./utils/utils')
 const { EXIT_CODES, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT } = require('./utils/constants')
 
 const { ORACLE_ALLOW_HTTP_FOR_RPC } = process.env
@@ -158,8 +158,9 @@ async function sendJobTx(jobs) {
   await GasPrice.start(chain, web3, true)
   const gasPriceOptions = GasPrice.gasPriceOptions()
 
+  const validatorAddress = await getValidatorAddress()
   const chainId = await getChainId(web3)
-  let nonce = await getNonce(web3, config.validatorAddress)
+  let nonce = await getNonce(web3, validatorAddress)
 
   await syncForEach(jobs, async job => {
     let gasLimit
@@ -169,6 +170,7 @@ async function sendJobTx(jobs) {
       gasLimit = addExtraGas(job.gasEstimate, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT)
     }
 
+    const privateKey = await loadPrivateKey()
     try {
       logger.info(`Sending transaction with nonce ${nonce}`)
       const txHash = await sendTx({
@@ -176,7 +178,7 @@ async function sendJobTx(jobs) {
         nonce,
         value: '0',
         gasLimit,
-        privateKey: config.validatorPrivateKey,
+        privateKey,
         to: job.to,
         chainId,
         web3,
@@ -196,7 +198,7 @@ async function sendJobTx(jobs) {
       )
 
       if (e.message.toLowerCase().includes('insufficient funds')) {
-        const currentBalance = await web3.eth.getBalance(config.validatorAddress)
+        const currentBalance = await web3.eth.getBalance(validatorAddress)
         const minimumBalance = gasLimit.multipliedBy(gasPriceOptions.gasPrice || gasPriceOptions.maxFeePerGas)
         logger.error(
           `Insufficient funds: ${currentBalance}. Stop processing messages until the balance is at least ${minimumBalance}.`
