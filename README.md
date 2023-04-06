@@ -1,6 +1,9 @@
 
 # Bridge construction
+
 This file includes how to deploy bridge contracts and how to run the corresponding oracle. The bridge allows users to lock existing ERC20 token in one chain(foreign) and mint the same amount of ERC677(ERC20 compatible) token in another(home). Or burning ERC677 for releasing ERC20 on the other hand.
+The structure of the bridge with oracles will be like:
+![](https://i.imgur.com/FXEBpUj.png)
 
 ## Overview
 
@@ -60,6 +63,7 @@ git clone https://github.com/poanetwork/tokenbridge
 ```
 
 If there is no need to build docker images for the TokenBridge components (oracle, monitor), initialize submodules, install dependencies, compile the Smart Contracts:
+
 ```
 git clone git@github.com:taisys-technologies/taisys-bridge.git
 cd taisys-bridge
@@ -135,6 +139,8 @@ Contracts Deployment have been saved to `bridgeDeploymentResults.json`
 ## Start oracle
 Oracle is in charge of verifying and forwarding messages between two chains. 
 * Put AMB bridge contract addresses and block heights in the `.env` file. 
+* For the oracle to fix its gasPrice automatically, `COMMON_FOREIGN_GAS_PRICE_SUPPLIER_URL` needs to be assigned with RPC URL such as `https://goerli.infura.io/v3/your-infura-project-id`.
+* As the gas price returned will be in Wei, `COMMON_FOREIGN_GAS_PRICE_FACTOR` need to be `desired_factor * 1e-9`.
 * Put addresses of both mediator contracts into `oracle/bridge_data/access-lists/allowance_list.txt`.
 * Provide address and private key of any validator provided in `.env` file when deploying bridge contracts as below.
 * At least `REQUIRED_NUMBER_OF_VALIDATORS`  distinct validators need to be running to keep oracle relaying transactions.
