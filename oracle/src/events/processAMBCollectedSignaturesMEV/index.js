@@ -9,6 +9,7 @@ const { parseAMBMessage } = require('../../../../commons')
 const estimateGas = require('../processAMBCollectedSignatures/estimateGas')
 const { AlreadyProcessedError, IncompatibleContractError, InvalidValidatorError } = require('../../utils/errors')
 const { MAX_CONCURRENT_EVENTS, EXTRA_GAS_ABSOLUTE } = require('../../utils/constants')
+const { getValidatorAddress } = require('../../utils/utils')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -96,7 +97,7 @@ function processCollectedSignaturesBuilder(config) {
         await Promise.all(signaturePromises)
         const signatures = packSignatures(signaturesArray)
         logger.info(`Processing messageId: ${parsedMessage.messageId}`)
-
+        const validatorAddress = await getValidatorAddress()
         let gasEstimate
         try {
           logger.debug('Estimate gas')
@@ -110,7 +111,7 @@ function processCollectedSignaturesBuilder(config) {
             message,
             numberOfCollectedSignatures: NumberOfCollectedSignatures,
             messageId: parsedMessage.messageId,
-            address: config.validatorAddress
+            address: validatorAddress
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
         } catch (e) {

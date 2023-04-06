@@ -3,7 +3,13 @@ const BigNumber = require('bignumber.js')
 const promiseRetry = require('promise-retry')
 const Web3 = require('web3')
 const { GAS_PRICE_BOUNDARIES } = require('./constants')
+const { getPrivateKeyFromGCPSecretManager } = require('../../scripts/cloud_service/gcp')
 
+const {
+  GCP_SECRET_MGR_ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY,
+  ORACLE_VALIDATOR_ADDRESS,
+  ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY
+} = process.env
 const { toBN, toWei } = Web3.utils
 
 const retrySequence = [1, 2, 3, 5, 8, 13, 21, 34, 55, 60]
@@ -56,6 +62,20 @@ async function waitForUnsuspend(getSuspendFlag, cb) {
       cb()
     }
   })
+}
+
+async function loadPrivateKey() {
+  if (ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY) return ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY
+  if (GCP_SECRET_MGR_ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY) {
+    const pk = await getPrivateKeyFromGCPSecretManager(GCP_SECRET_MGR_ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY)
+    return pk
+  }
+  return ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY
+}
+
+async function getValidatorAddress() {
+  const privateKey = await loadPrivateKey()
+  return ORACLE_VALIDATOR_ADDRESS || privateKeyToAddress(privateKey)
 }
 
 function addExtraGas(gas, extraPercentage, maxGasLimit = Infinity) {
@@ -243,5 +263,7 @@ module.exports = {
   getRetrySequence,
   promiseAny,
   readAccessListFile,
-  zipToObject
+  zipToObject,
+  loadPrivateKey,
+  getValidatorAddress
 }

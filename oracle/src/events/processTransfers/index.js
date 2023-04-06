@@ -6,6 +6,7 @@ const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
+const { getValidatorAddress } = require('../../utils/utils')
 const estimateGas = require('../processAffirmationRequests/estimateGas')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
@@ -78,6 +79,7 @@ function processTransfersBuilder(config) {
         }
 
         let gasEstimate
+        const validatorAddress = await getValidatorAddress()
         try {
           logger.debug('Estimate gas')
           gasEstimate = await estimateGas({
@@ -87,14 +89,14 @@ function processTransfersBuilder(config) {
             recipient: from,
             value,
             txHash: transfer.transactionHash,
-            address: config.validatorAddress
+            address: validatorAddress
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
         } catch (e) {
           if (e instanceof HttpListProviderError) {
             throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
           } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
+            logger.fatal({ address: validatorAddress }, 'Invalid validator')
             process.exit(EXIT_CODES.INCOMPATIBILITY)
           } else if (e instanceof AlreadySignedError) {
             logger.info(`Already signed transfer ${transfer.transactionHash}`)

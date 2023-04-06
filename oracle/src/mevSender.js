@@ -5,7 +5,7 @@ const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { sendTx } = require('./tx/sendTx')
 const { getNonce, getChainId, getBlock } = require('./tx/web3')
-const { addExtraGas, checkHTTPS, watchdog } = require('./utils/utils')
+const { addExtraGas, checkHTTPS, watchdog, loadPrivateKey } = require('./utils/utils')
 const { EXIT_CODES, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT } = require('./utils/constants')
 const { estimateProfit } = require('./events/processAMBCollectedSignaturesMEV')
 
@@ -115,12 +115,13 @@ async function main() {
       { nonce, fromBlock: pendingBlockNumber, toBlock: pendingBlockNumber + mevForeign.bundlesPerIteration - 1 },
       'Sending MEV bundles'
     )
+    const privateKey = await loadPrivateKey()
     const txHash = await sendTx({
       data: bestJob.data,
       nonce,
       value: bestJob.value,
       gasLimit,
-      privateKey: config.validatorPrivateKey,
+      privateKey,
       to: bestJob.to,
       chainId,
       web3,

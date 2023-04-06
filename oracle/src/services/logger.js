@@ -10,7 +10,7 @@ const logger = pino({
   name: config.name,
   level: process.env.ORACLE_LOG_LEVEL || 'debug',
   base: {
-    validator: config.validatorAddress
+    validator: process.env.ORACLE_VALIDATOR_ADDRESS
   }
 })
 

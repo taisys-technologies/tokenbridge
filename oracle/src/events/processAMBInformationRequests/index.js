@@ -14,6 +14,7 @@ const {
 const estimateGas = require('./estimateGas')
 const { getValidatorContract, getBlock, getBlockNumber, getRequiredBlockConfirmations } = require('../../tx/web3')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const { getValidatorAddress } = require('../../utils/utils')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -101,7 +102,7 @@ function processInformationRequestsBuilder(config) {
           result = ASYNC_CALL_ERRORS.RESULT_IS_TOO_LONG
         }
         logger.info({ requestSelector, method: asyncCallMethod, status, result }, 'Request result obtained')
-
+        const validatorAddress = await getValidatorAddress()
         let gasEstimate
         try {
           logger.debug('Estimate gas')
@@ -112,7 +113,7 @@ function processInformationRequestsBuilder(config) {
             messageId,
             status,
             result,
-            address: config.validatorAddress,
+            address: validatorAddress,
             homeBlockNumber: homeBlock.number
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
@@ -120,7 +121,7 @@ function processInformationRequestsBuilder(config) {
           if (e instanceof HttpListProviderError) {
             throw new Error('RPC Connection Error: confirmInformation Gas Estimate cannot be obtained.')
           } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
+            logger.fatal({ address: validatorAddress }, 'Invalid validator')
             process.exit(EXIT_CODES.INCOMPATIBILITY)
           } else if (e instanceof AlreadySignedError) {
             logger.info(`Already signed informationRequest ${messageId}`)
