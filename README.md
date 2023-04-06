@@ -139,7 +139,7 @@ Contracts Deployment have been saved to `bridgeDeploymentResults.json`
 ## Start oracle
 Oracle is in charge of verifying and forwarding messages between two chains. 
 * Put AMB bridge contract addresses and block heights in the `.env` file. 
-* For the oracle to fix its gasPrice automatically, `COMMON_FOREIGN_GAS_PRICE_SUPPLIER_URL` needs to be assigned with RPC URL such as `https://goerli.infura.io/v3/your-infura-project-id`.
+* For the oracle to fix its gasPrice automatically, `COMMON_FOREIGN_GAS_PRICE_SUPPLIER_URL` needs to be assigned with `eip1559-gas-estimation`.
 * As the gas price returned will be in Wei, `COMMON_FOREIGN_GAS_PRICE_FACTOR` need to be `desired_factor * 1e-9`.
 * Put addresses of both mediator contracts into `oracle/bridge_data/access-lists/allowance_list.txt`.
 * Provide address and private key of any validator provided in `.env` file when deploying bridge contracts as below.
