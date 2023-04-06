@@ -4,6 +4,7 @@ const { estimateFees } = require('@mycrypto/gas-estimation')
 const fetch = require('node-fetch')
 const { BRIDGE_MODES } = require('./constants')
 const { REWARDABLE_VALIDATORS_ABI } = require('./abis')
+const Web3 = require("web3")
 
 const gasPriceOracle = new GasPriceOracle()
 
@@ -180,6 +181,7 @@ const normalizeGasPrice = (oracleGasPrice, factor, limits = null) => {
   return toWei(gasPrice.toFixed(2).toString(), 'gwei')
 }
 
+//    let oracleGasPrice = await web3.eth.getGasPrice();
 const gasPriceFromSupplier = async (web3, url, options = {}) => {
   try {
     let json
