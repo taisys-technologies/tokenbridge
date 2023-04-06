@@ -9,6 +9,8 @@ const { sendTx } = require('./tx/sendTx')
 const { getNonce, getChainId } = require('./tx/web3')
 const {
   addExtraGas,
+  applyMinGasFeeBump,
+  chooseGasPriceOptions,
   checkHTTPS,
   syncForEach,
   waitForFunds,
@@ -19,7 +21,7 @@ const {
   isInsufficientBalanceError,
   isNonceError
 } = require('./utils/utils')
-const { EXIT_CODES, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT } = require('./utils/constants')
+const { EXIT_CODES, EXTRA_GAS_PERCENTAGE, MAX_GAS_LIMIT, MIN_GAS_PRICE_BUMP_FACTOR } = require('./utils/constants')
 
 const { ORACLE_TX_REDUNDANCY } = process.env
 
@@ -30,8 +32,8 @@ if (process.argv.length < 3) {
 
 const config = require(path.join('../config/', process.argv[2]))
 
-const { web3, web3Fallback } = config
-const web3Redundant = ORACLE_TX_REDUNDANCY === 'true' ? config.web3Redundant : web3
+const { web3, web3Fallback, syncCheckInterval } = config.main
+const web3Redundant = ORACLE_TX_REDUNDANCY === 'true' ? config.main.web3Redundant : web3
 
 const nonceKey = `${config.id}:nonce`
 let chainId = 0
@@ -41,8 +43,9 @@ async function initialize() {
     const checkHttps = checkHTTPS(process.env.ORACLE_ALLOW_HTTP_FOR_RPC, logger)
 
     web3.currentProvider.urls.forEach(checkHttps(config.id))
+    web3.currentProvider.startSyncStateChecker(syncCheckInterval)
 
-    GasPrice.start(config.id)
+    GasPrice.start(config.id, web3)
 
     chainId = await getChainId(web3)
     connectQueue()
@@ -55,7 +58,6 @@ async function initialize() {
 function connectQueue() {
   connectSenderToQueue({
     queueName: config.queue,
-    oldQueueName: config.oldQueue,
     resendInterval: config.resendInterval,
     cb: options => {
       if (config.maxProcessingTime) {
@@ -121,7 +123,7 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
 
     const txArray = JSON.parse(msg.content)
     logger.debug(`Msg received with ${txArray.length} Tx to send`)
-    const gasPrice = GasPrice.getPrice().toString(10)
+    const gasPriceOptions = GasPrice.gasPriceOptions()
 
     let nonce
     let insufficientFunds = false
@@ -147,6 +149,7 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
       }
 
       try {
+        const newGasPriceOptions = chooseGasPriceOptions(gasPriceOptions, job.gasPriceOptions)
         if (isResend) {
           const tx = await web3Fallback.eth.getTransaction(job.txHash)
 
@@ -159,24 +162,26 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
             nonce = await readNonce(true)
           }
 
-          logger.info(`Transaction ${job.txHash} was not mined, updating gasPrice: ${job.gasPrice} -> ${gasPrice}`)
+          const oldGasPrice = JSON.stringify(job.gasPriceOptions)
+          const newGasPrice = JSON.stringify(newGasPriceOptions)
+          logger.info(`Transaction ${job.txHash} was not mined, updating gasPrice: ${oldGasPrice} -> ${newGasPrice}`)
         }
         logger.info(`Sending transaction with nonce ${nonce}`)
         const txHash = await sendTx({
           data: job.data,
           nonce,
-          gasPrice,
-          amount: '0',
+          value: '0',
           gasLimit,
           privateKey: config.validatorPrivateKey,
           to: job.to,
           chainId,
-          web3: web3Redundant
+          web3: web3Redundant,
+          gasPriceOptions: newGasPriceOptions
         })
         const resendJob = {
           ...job,
           txHash,
-          gasPrice
+          gasPriceOptions: newGasPriceOptions
         }
         resendJobs.push(resendJob)
 
@@ -194,8 +199,8 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
 
         if (isGasPriceError(e)) {
           logger.info('Replacement transaction underpriced, forcing gas price update')
-          GasPrice.start(config.id)
-          failedTx.push(job)
+          GasPrice.start(config.id, web3)
+          failedTx.push(applyMinGasFeeBump(job, MIN_GAS_PRICE_BUMP_FACTOR))
         } else if (isResend || isSameTransactionError(e)) {
           resendJobs.push(job)
         } else {
@@ -208,7 +213,7 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
         if (isInsufficientBalanceError(e)) {
           insufficientFunds = true
           const currentBalance = await web3.eth.getBalance(config.validatorAddress)
-          minimumBalance = gasLimit.multipliedBy(gasPrice)
+          minimumBalance = gasLimit.multipliedBy(gasPriceOptions.gasPrice || gasPriceOptions.maxFeePerGas)
           logger.error(
             `Insufficient funds: ${currentBalance}. Stop processing messages until the balance is at least ${minimumBalance}.`
           )
