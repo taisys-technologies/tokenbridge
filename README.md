@@ -34,7 +34,7 @@ Additionally there are [Smart Contracts](https://github.com/poanetwork/tokenbrid
 This section demonstrates how to deploy bridge contracts and how to run the corresponding oracle. Before running any scripts, a target ERC20 contract address which would be exchanged to another chain should be ready.
 
 In our settings, contracts deployed are:
-* foreige
+* foreign
   * bridge: `ForeignAMB.sol`
   * validator: `BridgeValidators.sol`
   * mediator: `ForeignAMBErc677ToErc677.sol`
@@ -117,11 +117,15 @@ Contracts Deployment have been saved to `bridgeDeploymentResults.json`
 ```
 
 ### Start oracle
-Oracle is in charge of verifying and forwarding messages between two chains. 
+In the directory `oracle`, oracle is in charge of verifying and forwarding messages between two chains. Renew `.env` file with the template, `.env.example`.
 * Put AMB bridge contract addresses and block heights in the `.env` file. 
   * `COMMON_HOME_BRIDGE_ADDRESS=`
   * `ORACLE_HOME_START_BLOCK=11882086`
-* Put addresses of both mediator contracts into `oracle/bridge_data/access-lists/allowance_list.txt`.
+* Put addresses of both mediator contracts into `oracle/bridge_data/access-lists/allowance_list.txt`. Addresses are simply separated by newlines as shown below.
+  ```
+  0xA38E358Ed15cc4cb5Bda6d199bb4930101Aff962
+  0xEe74212F50cAf1B4A78901c035F87B09aA70d8Ca
+  ```
 * Provide address and private key of any validator provided in `.env` file when deploying bridge contracts as below.
 * At least `REQUIRED_NUMBER_OF_VALIDATORS`  distinct validators need to be running to keep oracle relaying transactions.
 ```
